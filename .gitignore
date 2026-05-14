@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+db.sqlite3
+media/
+chroma_db/
+staticfiles/
+.vscode/
+.idea/
+*.log
+models/
+*.nemo
+*.zip
+.cache/

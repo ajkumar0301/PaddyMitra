@@ -1,0 +1,47 @@
+{% extends 'base.html' %}{% load irri_extras %}
+{% block page_title %}{{ catalogue.name }}{% endblock %}
+{% block topbar_actions %}
+  {% if user|role_has:"Administrator,Editor" %}
+    <form method="post" action="{% url 'catalogues:build_vdb' catalogue.slug %}" style="display:inline;">{% csrf_token %}<button class="btn btn-sm btn-primary">{% icon "database" 14 %} Build Vector DB</button></form>
+    <a href="{% url 'catalogues:edit' catalogue.slug %}" class="btn btn-sm btn-secondary">{% icon "edit" 14 %} Edit</a>
+  {% endif %}
+  <a href="{% url 'catalogues:search' catalogue.slug %}" class="btn btn-sm btn-secondary">{% icon "search" 14 %} Search</a>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h2 style="margin:0 0 6px;">{{ catalogue.name }}</h2>
+    <div style="color:var(--gray-500);font-size:12px;">{{ catalogue.documents_count }} documents · {{ catalogue.geography }} · {{ catalogue.season_year }}</div>
+    <p style="margin-top:12px;">{{ catalogue.description|linebreaks }}</p>
+    <div class="detail-grid" style="border:1px solid var(--gray-200);border-radius:var(--radius-md);overflow:hidden;">
+      <div class="detail-label">Slug</div><div class="detail-value" style="font-family:monospace;">{{ catalogue.slug }}</div>
+      <div class="detail-label">Status</div><div class="detail-value"><span class="badge {{ catalogue.status|badge_class }}">{{ catalogue.status }}</span></div>
+      <div class="detail-label">Vector DB</div><div class="detail-value"><span class="badge {{ catalogue.vector_db_status|badge_class }}">{{ catalogue.get_vector_db_status_display }}</span> {% if catalogue.vector_db_chunks_count %}<span style="color:var(--gray-500);">{{ catalogue.vector_db_chunks_count }} chunks from {{ catalogue.documents_count }} docs</span>{% endif %}</div>
+      <div class="detail-label">Embedding model</div><div class="detail-value">{{ catalogue.embedding_model|default:"—" }}</div>
+      <div class="detail-label">Collection</div><div class="detail-value" style="font-family:monospace;">{{ catalogue.vector_store_collection_name }}</div>
+      <div class="detail-label">Last built</div><div class="detail-value">{{ catalogue.vector_db_generated_at|date:"d M Y, H:i"|default:"—" }}</div>
+      {% if catalogue.vector_db_error %}<div class="detail-label" style="color:#B91C1C;">Error</div><div class="detail-value" style="color:#B91C1C;font-size:12px;">{{ catalogue.vector_db_error|truncatechars:300 }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Documents in this catalogue ({{ catalogue.documents_count }})</h3></div>
+  <table class="data-table">
+    <thead><tr><th>ID</th><th>Title</th><th>Crop</th><th>Type</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for d in catalogue.documents.all %}
+      <tr>
+        <td>{{ d.doc_code }}</td>
+        <td><a href="{% url 'documents:detail' d.pk %}">{{ d.title|truncatechars:70 }}</a></td>
+        <td>{{ d.crop }}</td>
+        <td>{{ d.content_type }}</td>
+        <td><span class="badge {{ d.status|badge_class }}">{{ d.status_display_short }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-400);">No documents attached.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

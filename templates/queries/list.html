@@ -1,0 +1,85 @@
+{% extends 'base.html' %}{% load irri_extras %}
+{% block page_title %}Queries{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'queries:demo' %}" class="btn btn-primary btn-sm">{% icon "sparkles" 14 %} Run demo query</a>
+{% endblock %}
+{% block content %}
+<div class="stats-grid fade-in">
+  <div class="stat-card"><div class="stat-icon blue">{% icon "chat" 22 %}</div><div class="stat-value">{{ total }}</div><div class="stat-label">Total Queries</div></div>
+  <div class="stat-card"><div class="stat-icon green">{% icon "check" 22 %}</div><div class="stat-value">{{ responded }}</div><div class="stat-label">Responded</div></div>
+  <div class="stat-card"><div class="stat-icon amber">{% icon "clock" 22 %}</div><div class="stat-value">{{ pending }}</div><div class="stat-label">Pending / Failed</div></div>
+  <div class="stat-card"><div class="stat-icon red">{% icon "flag" 22 %}</div><div class="stat-value">{{ flagged }}</div><div class="stat-label">Flagged</div></div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <h3>All farmer queries</h3>
+    <form method="get" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <select name="category" class="form-control" style="width:140px;padding:6px 10px;font-size:12px;">
+        <option value="">All Categories</option>
+        {% for s, l in category_choices %}<option value="{{ s }}" {% if request.GET.category == s %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="feedback" class="form-control" style="width:130px;padding:6px 10px;font-size:12px;">
+        <option value="">All Feedback</option>
+        {% for s, l in feedback_choices %}<option value="{{ s }}" {% if request.GET.feedback == s %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="season" class="form-control" style="width:120px;padding:6px 10px;font-size:12px;">
+        <option value="">All Seasons</option>
+        {% for s, l in season_choices %}<option value="{{ s }}" {% if request.GET.season == s %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="crop_stage" class="form-control" style="width:130px;padding:6px 10px;font-size:12px;">
+        <option value="">All Crop Stages</option>
+        {% for s, l in crop_stage_choices %}<option value="{{ s }}" {% if request.GET.crop_stage == s %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+      <div class="search-bar"><input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search..."></div>
+      <button class="btn btn-secondary btn-sm">Filter</button>
+    </form>
+  </div>
+  <table class="data-table">
+    <thead><tr>
+      <th>ID</th><th>Time</th><th>District</th>
+      <th style="min-width:240px;">Query &amp; Response</th>
+      <th>Category</th><th>Task Type</th><th>Problem</th>
+      <th>Season</th><th>Stage</th><th>Missing</th><th>Time</th><th>Feedback</th>
+    </tr></thead>
+    <tbody>
+      {% for q in queries %}
+      <tr>
+        <td><a href="{% url 'queries:detail' q.pk %}" style="color:var(--irri-green);font-weight:600;">{{ q.code }}</a></td>
+        <td>{{ q.timestamp|date:"d M, H:i" }}</td>
+        <td>{{ q.district }}</td>
+        <td style="min-width:240px;max-width:420px;">
+          <div style="color:var(--gray-800);font-weight:500;line-height:1.35;display:flex;gap:6px;align-items:flex-start;">
+            <span style="color:var(--gray-400);">{% icon "chat" 14 %}</span>
+            <span>{{ q.translated_query_text|truncatechars:110 }}</span>
+          </div>
+          {% if q.ai_response_text %}
+          <div style="margin-top:6px;padding:6px 8px;background:#E8F5ED;border-left:3px solid var(--irri-green);border-radius:4px;font-size:12px;line-height:1.45;color:var(--gray-700);">
+            <strong style="font-size:10px;letter-spacing:0.04em;color:var(--irri-green);text-transform:uppercase;">AI Response</strong><br>
+            {{ q.ai_response_text|truncatechars:180 }}
+          </div>
+          {% elif q.status == 'Failed' %}
+          <div style="margin-top:6px;padding:6px 8px;background:#FEE2E2;border-left:3px solid #DC2626;border-radius:4px;font-size:12px;color:#B91C1C;">
+            <strong style="font-size:10px;letter-spacing:0.04em;text-transform:uppercase;">Failed</strong> &mdash; see details
+          </div>
+          {% else %}
+          <div style="margin-top:6px;font-size:11px;color:var(--gray-400);font-style:italic;">No response yet</div>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-blue">{{ q.category|default:"—" }}</span></td>
+        <td style="font-size:11px;">{{ q.task_type|default:"—" }}</td>
+        <td style="font-size:11px;">{{ q.problem_entity|default:"—" }}</td>
+        <td style="font-size:11px;">{{ q.season|default:"—" }}</td>
+        <td style="font-size:11px;">{{ q.crop_stage|default:"—" }}</td>
+        <td style="font-size:11px;color:#92400E;">{{ q.missing_context|truncatechars:30 }}</td>
+        <td>{{ q.response_time_seconds }}s</td>
+        <td>{% if q.farmer_feedback %}<span class="badge {{ q.farmer_feedback|badge_class }}">{{ q.farmer_feedback }}</span>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="12" style="text-align:center;padding:30px;color:var(--gray-400);">No queries yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include 'partials/pagination.html' %}
+</div>
+{% endblock %}
