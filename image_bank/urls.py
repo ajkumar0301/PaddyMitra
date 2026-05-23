@@ -6,6 +6,7 @@ app_name = "image_bank"
 
 urlpatterns = [
     path("", views.CataloguePickerView.as_view(), name="list"),
+    path("purge-all/", views.purge_all_vectors, name="purge_all"),
     path("<slug:slug>/", views.GroupListView.as_view(), name="groups"),
     path("<slug:slug>/upload/", views.GroupCreateView.as_view(), name="group_create"),
     path("<slug:slug>/reindex/", views.reindex_catalogue, name="reindex"),

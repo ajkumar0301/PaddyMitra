@@ -1,5 +1,15 @@
 {% extends 'base.html' %}{% load irri_extras %}
 {% block page_title %}Image Bank — pick a catalogue{% endblock %}
+{% block topbar_actions %}
+  {% if user|role_has:"Administrator" %}
+    <form method="post" action="{% url 'image_bank:purge_all' %}" style="display:inline;">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-danger" onclick="return confirm('Wipe ALL image vectors across every catalogue and re-embed only the images currently in the DB? Use this if stale/deleted images are still influencing answers.');">
+        Purge ALL image vectors
+      </button>
+    </form>
+  {% endif %}
+{% endblock %}
 {% block content %}
 <div class="card">
   <div class="card-header"><h3>Image Bank</h3></div>

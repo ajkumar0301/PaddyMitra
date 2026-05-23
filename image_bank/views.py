@@ -17,6 +17,8 @@ from .models import ImageGroup, KnowledgeImage
 from .services.image_vector_store import (
     add_image as vs_add,
     count as vs_count,
+    purge_catalogue as vs_purge_catalogue,
+    remove_group as vs_remove_group,
     remove_image as vs_remove,
     reset_collection as vs_reset,
 )
@@ -259,10 +261,18 @@ class GroupDeleteView(RoleRequiredMixin, View):
     def post(self, request, slug, gid):
         catalogue = get_object_or_404(Catalogue, slug=slug)
         group = get_object_or_404(ImageGroup, pk=gid, catalogue=catalogue)
+        prefix = group.prefix
+        # Remove individual rows by id (catches normal entries) AND by metadata
+        # (catches orphaned vectors whose ki_id no longer exists, e.g. left over
+        # from a previous prefix that has since been deleted).
         for ki in group.images.all():
             vs_remove(ki.pk)
+        vs_remove_group(group.pk, prefix=prefix)
         group.delete()
-        messages.success(request, f"Group '{group.prefix}' deleted.")
+        messages.success(
+            request,
+            f"Group '{prefix}' deleted along with all its CLIP vectors.",
+        )
         return redirect("image_bank:groups", slug=catalogue.slug)
 
 
@@ -288,6 +298,8 @@ def reindex_catalogue(request, slug):
         messages.error(request, "Only administrators can reindex.")
         return redirect("image_bank:groups", slug=slug)
     catalogue = get_object_or_404(Catalogue, slug=slug)
+    # First purge every vector belonging to this catalogue (kills orphans).
+    vs_purge_catalogue(catalogue.id)
     n = 0
     for ki in KnowledgeImage.objects.filter(catalogue=catalogue):
         try:
@@ -295,5 +307,32 @@ def reindex_catalogue(request, slug):
             n += 1
         except Exception:
             log.exception("Reindex failed for %s", ki.pk)
-    messages.success(request, f"Reindexed {n} image(s) in '{catalogue.name}'.")
+    messages.success(
+        request,
+        f"Purged old vectors and reindexed {n} image(s) in '{catalogue.name}'.",
+    )
     return redirect("image_bank:groups", slug=catalogue.slug)
+
+
+def purge_all_vectors(request):
+    """Admin-only: wipe the entire `image_bank` Chroma collection (all catalogues),
+    then re-embed every KnowledgeImage that exists in the DB. Use this if stale
+    vectors from previously-deleted images are still influencing answers."""
+    role = getattr(request.user, "role", None)
+    role_name = role.name if role else ""
+    if role_name not in ("Administrator",):
+        messages.error(request, "Only administrators can purge image vectors.")
+        return redirect("image_bank:list")
+    vs_reset()
+    n = 0
+    for ki in KnowledgeImage.objects.all():
+        try:
+            vs_add(ki)
+            n += 1
+        except Exception:
+            log.exception("Re-add failed for %s", ki.pk)
+    messages.success(
+        request,
+        f"Purged the entire image vector store and re-indexed {n} image(s) from the DB.",
+    )
+    return redirect("image_bank:list")

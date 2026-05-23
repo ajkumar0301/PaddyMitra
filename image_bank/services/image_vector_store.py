@@ -78,6 +78,31 @@ def remove_image(ki_id: int):
         log.warning("Failed to delete image %s from vector store: %s", ki_id, exc)
 
 
+def remove_group(group_id: int, prefix: str = ""):
+    """Delete every vector belonging to an ImageGroup, including orphans whose
+    `ki_id` no longer exists in the DB. We match by metadata `group_id` AND
+    (optionally) by metadata `prefix` so stale entries from before this group
+    existed (same prefix, different group_id) are also removed."""
+    coll = _collection()
+    try:
+        coll.delete(where={"group_id": int(group_id)})
+    except Exception as exc:
+        log.warning("Failed to delete group %s by group_id: %s", group_id, exc)
+    if prefix:
+        try:
+            coll.delete(where={"prefix": prefix})
+        except Exception as exc:
+            log.warning("Failed to delete group %s by prefix '%s': %s", group_id, prefix, exc)
+
+
+def purge_catalogue(catalogue_id: int):
+    """Delete every vector belonging to a catalogue."""
+    try:
+        _collection().delete(where={"catalogue_id": int(catalogue_id)})
+    except Exception as exc:
+        log.warning("Failed to purge catalogue %s vectors: %s", catalogue_id, exc)
+
+
 def reset_collection():
     try:
         _get_client().delete_collection(COLLECTION_NAME)

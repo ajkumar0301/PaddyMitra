@@ -386,30 +386,59 @@ def run_pipeline_for_image(
         except Exception:
             user_q_en = user_query_text
 
+    score = identification.get("score")
+    score_str = f"{score:.2f}" if isinstance(score, (int, float)) else "n/a"
+
     if not identification.get("matched") or not visual_desc:
         if user_q_en:
             synth_query_en = (
-                f"{user_q_en}\n\n(The system could not identify the uploaded image. "
-                "Answer based on general knowledge and ask the user for a clearer photo "
-                "or more details if needed.)"
+                f"{user_q_en}\n\n"
+                "(No matching reference image was found in the knowledge base. "
+                "Answer the user's question using general knowledge and the retrieved "
+                "documents. If the question depends on what is visually present, ask "
+                "the user for a clearer photo or more details.)"
             )
         else:
             synth_query_en = (
-                "The system could not identify the uploaded image. Tell the user what "
-                "extra information or a clearer photo would help."
+                "An image was uploaded but no matching reference image was found in the "
+                "knowledge base. Tell the user what extra information or a clearer photo "
+                "would help."
             )
     else:
         topic = prefix.replace("_", " ")
         if user_q_en:
+            # User has a specific question. The CLIP match is a HINT, not a fact —
+            # the closest visual neighbour may still be a different concept (e.g.
+            # growth stage when the user is asking about disease). Let the LLM
+            # reconcile the two and disagree if the topics don't line up.
+            confidence_note = (
+                "low confidence — treat as a tentative hint only"
+                if low_conf else
+                f"similarity score {score_str}"
+            )
             synth_query_en = (
-                f"The uploaded image has been identified as {topic} (high-confidence match "
-                "from the visual knowledge base). Treat this identification as a fact and "
-                f"answer the user's question:\n\n{user_q_en}"
+                f"USER QUESTION:\n{user_q_en}\n\n"
+                f"VISUAL HINT (from a CLIP image-similarity search; {confidence_note}):\n"
+                f"The uploaded photo most closely resembles reference images of '{topic}'.\n\n"
+                "INSTRUCTIONS:\n"
+                "- Answer the USER QUESTION directly. Do NOT change the topic.\n"
+                "- The VISUAL HINT may or may not be relevant to what the user is asking. "
+                "If the hint's topic does not match the user's question (for example, the "
+                "hint is a growth stage but the user asks about disease or nutrient "
+                "deficiency), say so explicitly and do not assert the hint as a diagnosis.\n"
+                "- Only use the hint if it is genuinely relevant to the user's question.\n"
+                "- If the visual hint is low confidence, treat it cautiously.\n"
             )
         else:
+            # No user question — pure image-as-query. Identification is the answer.
+            confidence_note = (
+                "low confidence" if low_conf else f"similarity score {score_str}"
+            )
             synth_query_en = (
-                f"The uploaded image has been identified as {topic} (high-confidence match "
-                "from the visual knowledge base). Briefly explain what it is and what to do."
+                f"An uploaded image was matched to reference images of '{topic}' "
+                f"({confidence_note}) in the visual knowledge base. "
+                "Briefly explain what this is and what the user should do about it. "
+                "If the match is low confidence, say so and ask for a clearer photo."
             )
 
     # Run the existing text pipeline using the synthesized English query.
