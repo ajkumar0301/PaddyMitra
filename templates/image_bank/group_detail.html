@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% load irri_extras %}
 {% block page_title %}{{ group.prefix }} — {{ catalogue.name }}{% endblock %}
 {% block topbar_actions %}
-  <a href="{% url 'image_bank:groups' catalogue.slug %}" class="btn btn-sm btn-secondary">← Back to groups</a>
+  <a href="{% url 'catalogues:detail' catalogue.slug %}#image-groups" class="btn btn-sm btn-secondary">← Back to catalogue</a>
   <a href="{% url 'image_bank:group_delete' catalogue.slug group.pk %}" class="btn btn-sm btn-danger">Delete group</a>
 {% endblock %}
 {% block content %}

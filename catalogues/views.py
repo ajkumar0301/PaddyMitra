@@ -138,6 +138,30 @@ class CatalogueDetailView(LoginRequiredMixin, DetailView):
     template_name = "catalogues/detail.html"
     context_object_name = "catalogue"
 
+    def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from django.db.models import Count
+
+        ctx = super().get_context_data(**kwargs)
+        catalogue = self.object
+
+        # Paginated documents
+        docs_qs = catalogue.documents.all().select_related("category", "subcategory")
+        docs_paginator = Paginator(docs_qs, 20)
+        ctx["documents_page"] = docs_paginator.get_page(self.request.GET.get("docs_page"))
+
+        # Paginated image groups (with image counts + cover thumbnail prefetch)
+        groups_qs = (
+            catalogue.image_groups
+            .annotate(n_images=Count("images"))
+            .prefetch_related("images")
+            .order_by("prefix")
+        )
+        groups_paginator = Paginator(groups_qs, 12)
+        ctx["image_groups_page"] = groups_paginator.get_page(self.request.GET.get("groups_page"))
+        ctx["image_groups_total"] = groups_qs.count()
+        return ctx
+
 
 class CatalogueCreateView(EditorMixin, CreateView):
     model = Catalogue

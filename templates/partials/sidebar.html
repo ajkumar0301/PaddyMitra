@@ -20,11 +20,6 @@
     <a href="{% url 'keywords:list' %}" class="sidebar-link {% active active_nav 'keywords' %}">
       {% icon "tag" 18 %} Keywords
     </a>
-    {% if user|role_has:"Administrator,Editor" %}
-    <a href="{% url 'image_bank:list' %}" class="sidebar-link {% active active_nav 'image_bank' %}">
-      {% icon "document" 18 %} Image Bank
-    </a>
-    {% endif %}
 
     <div class="sidebar-section">Configuration</div>
     <a href="{% url 'catalogues:list' %}" class="sidebar-link {% active active_nav 'catalogues' %}">

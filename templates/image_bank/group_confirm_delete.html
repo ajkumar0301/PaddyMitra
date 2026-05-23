@@ -6,7 +6,7 @@
     <h3>Delete group «{{ group.prefix }}»?</h3>
     <p>This will permanently remove {{ group.image_count }} image{{ group.image_count|pluralize }} and the visual description from catalogue <strong>{{ catalogue.name }}</strong>.</p>
     <form method="post">{% csrf_token %}
-      <a href="{% url 'image_bank:group_detail' catalogue.slug group.pk %}" class="btn btn-secondary">Cancel</a>
+      <a href="{% url 'catalogues:detail' catalogue.slug %}#image-groups" class="btn btn-secondary">Cancel</a>
       <button class="btn btn-danger">Delete group</button>
     </form>
   </div>

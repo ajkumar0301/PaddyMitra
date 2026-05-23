@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block page_title %}New visual group — {{ catalogue.name }}{% endblock %}
 {% block topbar_actions %}
-  <a href="{% url 'image_bank:groups' catalogue.slug %}" class="btn btn-sm btn-secondary">← Back to groups</a>
+  <a href="{% url 'catalogues:detail' catalogue.slug %}#image-groups" class="btn btn-sm btn-secondary">← Back to catalogue</a>
 {% endblock %}
 {% block content %}
 <div class="card" style="max-width:760px;">
@@ -28,7 +28,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <a href="{% url 'image_bank:groups' catalogue.slug %}" class="btn btn-secondary">Cancel</a>
+      <a href="{% url 'catalogues:detail' catalogue.slug %}#image-groups" class="btn btn-secondary">Cancel</a>
       <button class="btn btn-primary">Upload &amp; index</button>
     </div>
   </form>

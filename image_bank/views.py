@@ -165,7 +165,7 @@ class GroupCreateView(RoleRequiredMixin, View):
                 f"Uploaded {created} image(s) across {len(groups_used)} group(s) "
                 f"({', '.join(sorted(groups_used))}). {indexed} indexed in CLIP store.",
             )
-        return redirect("image_bank:groups", slug=catalogue.slug)
+        return redirect(f"{reverse('catalogues:detail', kwargs={'slug': catalogue.slug})}#image-groups")
 
 
 # ----------------- Group detail: images, add more, edit description -----------------
@@ -273,7 +273,7 @@ class GroupDeleteView(RoleRequiredMixin, View):
             request,
             f"Group '{prefix}' deleted along with all its CLIP vectors.",
         )
-        return redirect("image_bank:groups", slug=catalogue.slug)
+        return redirect(f"{reverse('catalogues:detail', kwargs={'slug': catalogue.slug})}#image-groups")
 
 
 class ImageDeleteView(RoleRequiredMixin, View):
