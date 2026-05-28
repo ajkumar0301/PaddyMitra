@@ -148,10 +148,13 @@ OPENAI_TTS_VOICE = config("OPENAI_TTS_VOICE", default="alloy")
 
 USE_LOCAL_EMBEDDINGS = config("USE_LOCAL_EMBEDDINGS", default=False, cast=bool)
 
-# --- Local AI4Bharat IndicConformer for Odia STT --------------------------
-# No env vars needed — the model weights are downloaded from HuggingFace on
-# first use and cached under ~/.cache/huggingface/. See
-# queries/services/indic_stt.py.
+# --- Odia STT --------------------------------------------------------------
+# Primary path: Sarvam AI hosted ASR (fast, Indic-tuned). Set SARVAM_API_KEY
+# to enable. If blank or the API fails, the request falls back to the local
+# Wav2Vec2 model (`Harveenchadha/odia_large_wav2vec2`) — slower but offline.
+SARVAM_API_KEY = config("SARVAM_API_KEY", default="")
+SARVAM_STT_URL = config("SARVAM_STT_URL", default="https://api.sarvam.ai/speech-to-text")
+SARVAM_STT_MODEL = config("SARVAM_STT_MODEL", default="saarika:v2.5")
 
 # --- WhatsApp / Picky Assist ----------------------------------------------
 

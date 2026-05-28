@@ -95,15 +95,32 @@
       </div>
       <div class="form-group">
         <label>Test Query <span style="color:var(--gray-400);font-size:11px;">(type, speak, or attach an image)</span></label>
-        <div style="position:relative;">
+
+        {# Idle: text input + mic button on the right #}
+        <div id="beta-query-idle" style="position:relative;">
           <input type="text" id="beta-query" name="query_text" class="form-control" style="padding-right:44px;" placeholder="e.g. What is the best treatment for rice blast disease?">
-          <button type="button" id="mic-btn" title="Click to record. Click again to stop."
+          <button type="button" id="mic-btn" title="Click to record."
                   style="position:absolute;right:6px;top:50%;transform:translateY(-50%);
                          background:transparent;border:0;cursor:pointer;padding:6px;
                          display:flex;align-items:center;justify-content:center;color:var(--gray-500);">
             {% icon "mic" 18 %}
           </button>
         </div>
+
+        {# Recording: timer + visualizer + tick + cross. Hidden by default. #}
+        <div id="beta-recording" style="display:none;align-items:center;gap:10px;height:42px;
+                                        border:1px solid var(--gray-300);border-radius:6px;
+                                        padding:0 10px;background:#fff;">
+          <span id="rec-timer" style="font-family:monospace;font-size:13px;color:#DC2626;min-width:38px;">0:00</span>
+          <canvas id="rec-canvas" style="flex:1;height:28px;display:block;"></canvas>
+          <button type="button" id="rec-cancel" title="Cancel"
+                  style="background:transparent;border:0;cursor:pointer;color:#DC2626;
+                         font-size:18px;line-height:1;padding:6px 8px;">✕</button>
+          <button type="button" id="rec-done" title="Stop &amp; transcribe"
+                  style="background:transparent;border:0;cursor:pointer;color:#059669;
+                         font-size:18px;line-height:1;padding:6px 8px;">✓</button>
+        </div>
+
         <div id="mic-status" style="font-size:11px;color:var(--gray-500);margin-top:4px;min-height:14px;">
           Click the mic to record (uses the Input Language above).
         </div>
@@ -260,66 +277,145 @@ function setBetaQuery(text) {
   radios.forEach(function(r) { r.addEventListener('change', paint); });
   paint();
 })();
-// ---------- Mic recording ----------
+// ---------- Mic recording with live visualizer ----------
 (function() {
-  var btn = document.getElementById('mic-btn');
-  var status = document.getElementById('mic-status');
-  var qInput = document.getElementById('beta-query');
-  var langSel = document.querySelector('#beta-form select[name="language"]');
-  if (!btn || !status || !qInput) return;
+  var micBtn   = document.getElementById('mic-btn');
+  var statusEl = document.getElementById('mic-status');
+  var qInput   = document.getElementById('beta-query');
+  var idleRow  = document.getElementById('beta-query-idle');
+  var recRow   = document.getElementById('beta-recording');
+  var timerEl  = document.getElementById('rec-timer');
+  var canvas   = document.getElementById('rec-canvas');
+  var doneBtn  = document.getElementById('rec-done');
+  var cancelBtn= document.getElementById('rec-cancel');
+  var langSel  = document.querySelector('#beta-form select[name="language"]');
+  if (!micBtn || !recRow || !qInput) return;
   if (!navigator.mediaDevices || !window.MediaRecorder) {
-    btn.disabled = true;
-    btn.title = 'Audio recording is not supported in this browser.';
-    status.textContent = 'Audio recording is not supported in this browser.';
+    micBtn.disabled = true;
+    micBtn.title = 'Audio recording is not supported in this browser.';
+    statusEl.textContent = 'Audio recording is not supported in this browser.';
     return;
   }
+
   var recorder = null;
   var chunks = [];
   var stream = null;
-  var recording = false;
+  var audioCtx = null;
+  var analyser = null;
+  var srcNode = null;
+  var rafId = null;
+  var startTime = 0;
+  var timerInterval = null;
+  var cancelled = false;
 
-  function setRecording(on) {
-    recording = on;
-    btn.style.color = on ? '#DC2626' : 'var(--gray-500)';
-    btn.title = on ? 'Click to stop recording' : 'Click to record. Click again to stop.';
+  function showRecordingUI(on) {
+    idleRow.style.display = on ? 'none' : '';
+    recRow.style.display  = on ? 'flex' : 'none';
+  }
+
+  function formatTime(ms) {
+    var s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  function drawBars() {
+    if (!analyser || !canvas) return;
+    var w = canvas.clientWidth;
+    var h = canvas.clientHeight;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    var bufLen = analyser.frequencyBinCount;
+    var data = new Uint8Array(bufLen);
+    analyser.getByteFrequencyData(data);
+
+    ctx.clearRect(0, 0, w, h);
+    var barCount = 32;
+    var step = Math.floor(bufLen / barCount);
+    var barW = (w - (barCount - 1) * 2) / barCount;
+    for (var i = 0; i < barCount; i++) {
+      var v = data[i * step] / 255;
+      var barH = Math.max(2, v * h);
+      ctx.fillStyle = '#10B981';
+      ctx.fillRect(i * (barW + 2), (h - barH) / 2, barW, barH);
+    }
+    rafId = requestAnimationFrame(drawBars);
+  }
+
+  function teardownStream() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    try { if (srcNode) srcNode.disconnect(); } catch (_) {}
+    try { if (audioCtx && audioCtx.state !== 'closed') audioCtx.close(); } catch (_) {}
+    try { if (stream) stream.getTracks().forEach(function(t) { t.stop(); }); } catch (_) {}
+    srcNode = null; analyser = null; audioCtx = null; stream = null;
   }
 
   async function startRec() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
-      status.textContent = 'Mic permission denied: ' + (e && e.message || e);
+      statusEl.textContent = 'Mic permission denied: ' + (e && e.message || e);
       return;
     }
     chunks = [];
+    cancelled = false;
+
     var mime = '';
     var prefs = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
     for (var i = 0; i < prefs.length; i++) {
-      if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(prefs[i])) { mime = prefs[i]; break; }
+      if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(prefs[i])) {
+        mime = prefs[i]; break;
+      }
     }
     recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     recorder.ondataavailable = function(e) { if (e.data && e.data.size) chunks.push(e.data); };
     recorder.onstop = function() {
-      try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (_) {}
       var blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-      var ext = (blob.type.indexOf('ogg') > -1) ? '.ogg' : (blob.type.indexOf('mp4') > -1 ? '.m4a' : '.webm');
+      teardownStream();
+      showRecordingUI(false);
+      if (cancelled) {
+        statusEl.textContent = 'Recording cancelled.';
+        return;
+      }
+      var ext = (blob.type.indexOf('ogg') > -1) ? '.ogg'
+              : (blob.type.indexOf('mp4') > -1) ? '.m4a' : '.webm';
       uploadAndTranscribe(blob, ext);
     };
+
+    // Web Audio analyser for live bars
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      srcNode  = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      srcNode.connect(analyser);
+    } catch (_) { /* visualizer optional */ }
+
+    showRecordingUI(true);
+    timerEl.textContent = '0:00';
+    startTime = Date.now();
+    timerInterval = setInterval(function() {
+      timerEl.textContent = formatTime(Date.now() - startTime);
+    }, 250);
+    drawBars();
     recorder.start();
-    setRecording(true);
-    status.textContent = 'Recording… click the mic again to stop.';
+    statusEl.textContent = 'Recording… click ✓ to stop, ✕ to cancel.';
   }
 
-  function stopRec() {
+  function stopRec(discard) {
+    cancelled = !!discard;
     if (recorder && recorder.state !== 'inactive') {
-      status.textContent = 'Stopping…';
+      statusEl.textContent = discard ? 'Cancelling…' : 'Stopping…';
       recorder.stop();
+    } else {
+      teardownStream();
+      showRecordingUI(false);
     }
-    setRecording(false);
   }
 
   function uploadAndTranscribe(blob, ext) {
-    status.textContent = 'Transcribing…';
+    statusEl.textContent = 'Transcribing…';
     var fd = new FormData();
     fd.append('audio', blob, 'recording' + ext);
     fd.append('language', langSel ? langSel.value : 'English');
@@ -332,19 +428,19 @@ function setBetaQuery(text) {
     }).then(function(r) { return r.json(); }).then(function(j) {
       if (j && j.ok) {
         qInput.value = (j.text || '').trim();
-        status.textContent = j.text ? 'Transcribed. Edit if needed, then Run Test.' : 'No speech detected.';
+        statusEl.textContent = j.text ? 'Transcribed. Edit if needed, then Run Test.' : 'No speech detected.';
         qInput.focus();
       } else {
-        status.textContent = 'Transcription failed: ' + (j && j.error || 'unknown error');
+        statusEl.textContent = 'Transcription failed: ' + (j && j.error || 'unknown error');
       }
     }).catch(function(e) {
-      status.textContent = 'Transcription error: ' + (e && e.message || e);
+      statusEl.textContent = 'Transcription error: ' + (e && e.message || e);
     });
   }
 
-  btn.addEventListener('click', function() {
-    if (!recording) { startRec(); } else { stopRec(); }
-  });
+  micBtn.addEventListener('click', startRec);
+  doneBtn.addEventListener('click', function() { stopRec(false); });
+  cancelBtn.addEventListener('click', function() { stopRec(true); });
 })();
 
 var bf = document.getElementById('beta-form');
