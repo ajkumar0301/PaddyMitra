@@ -44,5 +44,20 @@ class DocumentForm(forms.ModelForm):
             "organizations": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "journal_or_book": forms.TextInput(attrs={"class": "form-control"}),
             "countries": forms.TextInput(attrs={"class": "form-control"}),
-            "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "file": forms.ClearableFileInput(attrs={
+                "class": "form-control",
+                "accept": ".pdf,.docx,.xlsx,.csv,.txt",
+            }),
         }
+
+    ALLOWED_EXTENSIONS = (".pdf", ".docx", ".xlsx", ".csv", ".txt")
+
+    def clean_file(self):
+        f = self.cleaned_data.get("file")
+        if f and getattr(f, "name", ""):
+            name_lower = f.name.lower()
+            if not any(name_lower.endswith(ext) for ext in self.ALLOWED_EXTENSIONS):
+                raise forms.ValidationError(
+                    "Only PDF, DOCX, XLSX, CSV, or TXT files can be uploaded."
+                )
+        return f

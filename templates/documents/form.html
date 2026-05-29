@@ -8,7 +8,7 @@
     <div class="card-body">
       {% if form.errors %}<div class="login-error show">{{ form.errors }}</div>{% endif %}
       <div class="form-group"><label>Title <span class="required">*</span></label>{{ form.title }}</div>
-      <div class="form-group"><label>Upload file</label>{{ form.file }}<small style="color:var(--gray-400);font-size:11px;">PDF, DOC(X), TXT — up to 25 MB</small></div>
+      <div class="form-group"><label>Upload file</label>{{ form.file }}<small style="color:var(--gray-400);font-size:11px;">PDF, DOCX, XLSX, CSV, TXT — up to 25 MB</small></div>
       <div class="form-row">
         <div class="form-group"><label>Crop <span class="required">*</span></label>{{ form.crop }}</div>
         <div class="form-group"><label>Content Type <span class="required">*</span></label>{{ form.content_type }}</div>
