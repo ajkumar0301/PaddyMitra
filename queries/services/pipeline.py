@@ -149,7 +149,6 @@ FARMER_PERSONA = (
     " - Keep it short: 3-5 sentences, or a tight bullet list (max 5 bullets).\n"
     " - Avoid scientific jargon. If a technical word is unavoidable, give the common/local name too.\n"
     " - Use practical, actionable instructions: what to do, how much, when.\n"
-    " - Give dosages in everyday units (grams/litre, kg/acre), not in SI symbols alone.\n"
     " - Do NOT cite research papers or authors. Do NOT discuss mechanisms of action.\n"
     " - If the context is insufficient, say so plainly and ask for the missing detail in 1 sentence."
 )
@@ -161,9 +160,25 @@ RESEARCHER_PERSONA = (
     " - Give a thorough, structured response (headings, bullets, tables where useful).\n"
     " - Use scientific names, active ingredients, mechanisms, and measured values.\n"
     " - Cite the source documents you used by title (bracketed, e.g. [Source: ...]).\n"
-    " - Include trial numbers, percentages, rates (kg/ha, ppm, EC) where the context provides them.\n"
+    " - Include trial numbers and percentages where the context provides them.\n"
     " - Where methods or concentrations differ between sources, note the disagreement.\n"
     " - If context is insufficient, state the gap precisely and suggest what additional data would resolve it."
+)
+
+# Applied to BOTH personas. Most numeric errors farmers complain about come
+# from the LLM converting units (e.g. tons/ha → kg/acre) and losing precision
+# or making outright wrong conversions. We disable conversion entirely.
+UNIT_FIDELITY_RULES = (
+    "\n\nNUMERIC / UNIT FIDELITY (MANDATORY):\n"
+    " - Quote numbers and units EXACTLY as they appear in the CONTEXT. "
+    "Do not convert between units (e.g. do not change tons/hectare to kg/acre, "
+    "do not change kg/ha to lb/acre, do not change litres to gallons).\n"
+    " - Keep the same unit string the source used (e.g. \"5-6 tons per hectare\", "
+    "\"120 kg N/ha\", \"40 grams per litre\").\n"
+    " - Do not round, average, or rephrase numbers. If the source says \"5-6 tons/ha\", "
+    "write \"5-6 tons/ha\" — not \"about 5 tons\" and not \"2000-2400 kg/acre\".\n"
+    " - If the question asks for a unit not present in the CONTEXT, say so plainly "
+    "instead of converting.\n"
 )
 
 
@@ -173,7 +188,12 @@ def generate_answer(query_text_en: str, retrieved_hits: list, user_type: str = "
         for h in retrieved_hits
     )
     persona = RESEARCHER_PERSONA if (user_type or "").lower() == "researcher" else FARMER_PERSONA
-    sys = persona + "\n\nYou MUST answer using ONLY the context below.\n\nCONTEXT:\n" + context
+    sys = (
+        persona
+        + UNIT_FIDELITY_RULES
+        + "\n\nYou MUST answer using ONLY the context below.\n\nCONTEXT:\n"
+        + context
+    )
     return _chat([
         {"role": "system", "content": sys},
         {"role": "user", "content": query_text_en},
