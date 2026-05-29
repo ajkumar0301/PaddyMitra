@@ -142,6 +142,26 @@ def retrieve(catalogue, query_text_en: str, n_results: int = 6):
     return search_catalogue(catalogue, query_text_en, n_results=n_results)
 
 
+def _trace_retrieved_chunks(hits: list) -> list:
+    chunks = []
+    for position, hit in enumerate(hits, start=1):
+        meta = hit.get("metadata") or {}
+        chunk_text = (hit.get("chunk") or "").strip()
+        chunks.append({
+            "rank": position,
+            "document_id": meta.get("document_id"),
+            "document_title": meta.get("document_title") or "Untitled document",
+            "chunk_index": meta.get("chunk_index"),
+            "category": meta.get("category") or "",
+            "subcategory": meta.get("subcategory") or "",
+            "score": hit.get("score"),
+            "distance": hit.get("distance"),
+            "chunk": chunk_text[:1600],
+            "truncated": len(chunk_text) > 1600,
+        })
+    return chunks
+
+
 FARMER_PERSONA = (
     "You are PaddyMitra, an AI advisor speaking directly to a rice farmer in India. "
     "Answer in SIMPLE, PLAIN language a small-holder farmer can understand. "
@@ -257,6 +277,7 @@ def run_pipeline_for_text(
             "ms": int((time.monotonic() - t0) * 1000),
             "hits": len(hits),
         })
+        trace["retrieved_chunks"] = _trace_retrieved_chunks(hits)
 
         # 4. generate  (persona: farmer | researcher)
         t0 = time.monotonic()

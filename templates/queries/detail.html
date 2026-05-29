@@ -29,6 +29,21 @@
       <div class="detail-label">Source documents</div><div class="detail-value">{% for d in qobj.source_documents.all %}<a href="{% url 'documents:detail' d.pk %}"><span class="badge badge-blue">{{ d.doc_code }}</span></a> {{ d.title|truncatechars:40 }}<br>{% empty %}—{% endfor %}</div>
     </div>
 
+    {% if qobj.pipeline_trace.retrieved_chunks %}
+    <div style="margin-top:18px;background:#07130D;color:#D1FAE5;padding:0;border-radius:8px;border:1px solid #134E4A;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0F1F17;border-bottom:1px solid #134E4A;padding:9px 12px;">
+        <div style="font-size:11px;color:#A7F3D0;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">Retrieval terminal</div>
+        <div style="font-family:monospace;font-size:11px;color:#6EE7B7;">{{ qobj.pipeline_trace.retrieved_chunks|length }} chunks used as context</div>
+      </div>
+      <div style="max-height:420px;overflow:auto;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;">
+{% for chunk in qobj.pipeline_trace.retrieved_chunks %}<div style="margin-bottom:14px;"><span style="color:#34D399;">$ source[{{ chunk.rank }}]</span> <span style="color:#E5E7EB;">{{ chunk.document_title }}</span>
+<span style="color:#93C5FD;">  doc_id={{ chunk.document_id|default_if_none:"-" }} chunk={{ chunk.chunk_index|default_if_none:"-" }} score={{ chunk.score|default_if_none:"-" }}</span>{% if chunk.category or chunk.subcategory %}
+<span style="color:#FBBF24;">  {{ chunk.category }}{% if chunk.subcategory %} / {{ chunk.subcategory }}{% endif %}</span>{% endif %}
+<span style="color:#D1FAE5;">{{ chunk.chunk }}{% if chunk.truncated %} ...{% endif %}</span></div>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if qobj.pipeline_trace.image_query %}
     <div style="margin-top:18px;padding:14px;background:var(--gray-50);border-radius:8px;border:1px solid var(--gray-200);">
       <h4 style="font-size:12px;font-weight:600;color:var(--gray-500);margin:0 0 8px;">Image identification</h4>
